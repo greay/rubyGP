@@ -17,6 +17,9 @@ PMUT_PER_NODE = 0.05
 CROSSOVER_PROB = 0.9
 
 class TinyGP
+	
+	attr_accessor :pop
+	
 	def initialize(fname, s)
 		@buffer = Array.new(MAX_LEN, 0)
 		@fbestpop = 0.0
@@ -25,23 +28,18 @@ class TinyGP
 
 		@fitness = Array.new POPSIZE
 		@seed = s
-		if @seed >= 0 then
-			srand @seed
-		end
-		self.setup_fitness fname
+		srand @seed if @seed >= 0
 
+		self.setup_fitness fname
 		@x = []
 		FSET_START.times do
 			@x.push((@maxrandom - @minrandom) * rand + @minrandom)
 		end
-		@pop = self.create_random_pop(POPSIZE, DEPTH, @fitness)
 	end
 	
 	def run
 		primitive = @program[@pc += 1]
-		if primitive < FSET_START then
-			return @x[primitive]
-		end
+		return @x[primitive] if primitive < FSET_START
 		
 		case primitive
 		when ADD
@@ -64,9 +62,7 @@ class TinyGP
 	end
 	
 	def traverse(buffer, buffercount)
-		if buffer[buffercount] < FSET_START then
-			return buffercount += 1
-		end
+		return buffercount += 1 if buffer[buffercount] < FSET_START
 		
 		case buffer[buffercount]
 		when ADD..DIV
@@ -117,12 +113,9 @@ class TinyGP
 	end
 	
 	def grow(buffer, pos, max, depth)
+		return -1 if (pos >= max)
+
 		prim = rand(2)
-		
-		if (pos >= max) then
-			return -1
-		end
-		
 		if (pos == 0) then
 			prim = 1
 		end
@@ -139,8 +132,9 @@ class TinyGP
 				one_child = self.grow(buffer, pos, max, depth - 1)
 				if (one_child < 0) then
 					return -1
+				else
+					return grow(buffer, one_child, max, depth - 1)
 				end
-				return grow(buffer, one_child, max, depth - 1)
 			end
 		end
 		0 # should never get here
@@ -182,21 +176,21 @@ class TinyGP
 	def create_random_indiv(depth)
 		len = self.grow(@buffer, 0, MAX_LEN, depth)
 		while len < 0 do
-			len = grow(@buffer, 0, MAX_LEN, depth)
+			len = self.grow(@buffer, 0, MAX_LEN, depth)
 		end
 		ind = @buffer.slice(0, len)
 	end
 	
-	def create_random_pop(n, depth, fitness)
+	def create_random_pop(n, depth)
 		pop = []
-		n.times do |n|
+		n.times do
 			indiv = self.create_random_indiv depth
 			pop.push indiv
 			@fitness.push(self.fitness_function indiv)
 		end
 		pop
 	end
-	
+		
 	def stats(fitness, pop, gen)
 		best = rand(POPSIZE)
 		node_count = 0
@@ -223,7 +217,7 @@ class TinyGP
 		best = rand(POPSIZE)
 		fbest = -1.0e34
 		
-		tsize.times do |i|
+		tsize.times do
 			competitor = rand(POPSIZE)
 			if @fitness[competitor] > fbest then
 				fbest = @fitness[competitor]
@@ -237,7 +231,7 @@ class TinyGP
 		worst = rand(POPSIZE)
 		fworst = 1e34
 		
-		tsize.times do |i|
+		tsize.times do
 			competitor = rand(POPSIZE)
 			if @fitness[competitor] < fworst then
 				fworst = @fitness[competitor]
@@ -308,7 +302,7 @@ class TinyGP
 				puts "PROBLEM SOLVED"
 				return nil
 			end
-			POPSIZE.times do |indivs|
+			POPSIZE.times do
 				if rand < CROSSOVER_PROB then
 					parent1 = self.tournament(@fitness, TSIZE)
 					parent2 = self.tournament(@fitness, TSIZE)
@@ -333,5 +327,14 @@ end
 # and run...
 
 Benchmark.bm(15) do |x|
+
 	g = TinyGP.new("sin-data.txt", 23)
+	# x.report("meth 1:")   { g.pop = g.create_random_pop1(POPSIZE, DEPTH) }
+	# 
+	# g = TinyGP.new("sin-data.txt", 23)
+	# x.report("meth 2:")   { g.pop = g.create_random_pop2(POPSIZE, DEPTH) }
+	# 
+	# g = TinyGP.new("sin-data.txt", 23)
+	# x.report("meth 3:")   { g.pop = g.create_random_pop3(POPSIZE, DEPTH) }
+
 end
